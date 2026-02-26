@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PNW Sunshine Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+    }
+    header {
+      background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+      padding: 1rem 2rem;
+      text-align: center;
+      border-bottom: 1px solid #0f3460;
+    }
+    h1 { 
+      font-size: 1.8rem; 
+      color: #ffd700;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle { 
+      color: #94a3b8; 
+      font-size: 0.9rem; 
+    }
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 0.6rem 1.2rem;
+      background: transparent;
+      border: 1px solid #0f3460;
+      color: #94a3b8;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .tab:hover {
+      background: rgba(255, 215, 0, 0.1);
+      border-color: #ffd700;
+      color: #ffd700;
+    }
+    .tab.active {
+      background: #ffd700;
+      color: #1a1a2e;
+      border-color: #ffd700;
+      font-weight: 600;
+    }
+    #map {
+      height: calc(100vh - 180px);
+      width: 100%;
+    }
+    .legend {
+      background: rgba(26, 26, 46, 0.95);
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 0.5rem;
+    }
+    .legend h4 {
+      margin-bottom: 0.5rem;
+      color: #ffd700;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0.25rem 0;
+      font-size: 0.85rem;
+    }
+    .legend-emoji {
+      font-size: 1.2rem;
+    }
+    footer {
+      background: #16213e;
+      padding: 0.75rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #64748b;
+      border-top: 1px solid #0f3460;
+    }
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1000;
+      background: rgba(26, 26, 46, 0.95);
+      padding: 2rem;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .loading.hidden { display: none; }
+    .spinner {
+      font-size: 2rem;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .city-popup {
+      text-align: center;
+    }
+    .city-popup h3 {
+      margin-bottom: 0.5rem;
+      color: #1a1a2e;
+    }
+    .city-popup .weather-emoji {
+      font-size: 2rem;
+    }
+    .city-popup .conditions {
+      font-size: 0.9rem;
+      color: #666;
+    }
+    .city-popup .temp {
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>☀️ PNW Sunshine Finder</h1>
+    <p class="subtitle">Real-time sun tracker across the Pacific Northwest</p>
+    <div class="tabs">
+      <button class="tab active" data-day="0">Today</button>
+      <button class="tab" data-day="1">Tomorrow</button>
+      <button class="tab" data-day="sat" id="satTab">Saturday</button>
+      <button class="tab" data-day="sun" id="sunTab">Sunday</button>
+    </div>
+  </header>
+  
+  <div id="map"></div>
+  
+  <div class="loading" id="loading">
+    <div class="spinner">☀️</div>
+    <p>Checking the skies...</p>
+  </div>
+  
+  <footer>
+    Data from <a href="https://open-meteo.com/" style="color:#ffd700">Open-Meteo API</a> • 
+    Updated: <span id="lastUpdated">-</span>
+  </footer>
+
+  <script>
+    // Pacific Northwest cities with coordinates
+    const cities = [
+      { name: 'Seattle', lat: 47.6062, lon: -122.3321 },
+      { name: 'Bellingham', lat: 48.7519, lon: -122.4787 },
+      { name: 'Vancouver, BC', lat: 49.2827, lon: -123.1207 },
+      { name: 'Vantage', lat: 46.9454, lon: -119.9869 },
+      { name: 'Spokane', lat: 47.6588, lon: -117.4260 },
+      { name: 'Portland', lat: 45.5152, lon: -122.6784 },
+      { name: 'Bend', lat: 44.0582, lon: -121.3153 },
+      { name: 'North Bend, WA', lat: 47.4957, lon: -121.7868 },
+      { name: 'Snoqualmie Pass', lat: 47.4281, lon: -121.4116 },
+      { name: 'Mazama', lat: 48.5918, lon: -120.4043 },
+      { name: 'Leavenworth', lat: 47.5962, lon: -120.6615 },
+      { name: 'Walla Walla', lat: 46.0646, lon: -118.3430 },
+      { name: 'Olympia', lat: 47.0379, lon: -122.9007 },
+      { name: 'Tacoma', lat: 47.2529, lon: -122.4443 },
+      { name: 'Eugene', lat: 44.0521, lon: -123.0868 },
+      { name: 'Hurricane Ridge', lat: 47.9692, lon: -123.4986 },
+    ];
+
+    // Weather codes - sunny/clear conditions
+    const weatherCodes = {
+      0: { desc: 'Clear Sky', emoji: '☀️', sunny: true },
+      1: { desc: 'Mainly Clear', emoji: '🌤️', sunny: true },
+      2: { desc: 'Partly Cloudy', emoji: '⛅', sunny: false },
+      3: { desc: 'Overcast', emoji: '☁️', sunny: false },
+      45: { desc: 'Foggy', emoji: '🌫️', sunny: false },
+      48: { desc: 'Depositing Fog', emoji: '🌫️', sunny: false },
+      51: { desc: 'Light Drizzle', emoji: '🌦️', sunny: false },
+      53: { desc: 'Drizzle', emoji: '🌧️', sunny: false },
+      55: { desc: 'Dense Drizzle', emoji: '🌧️', sunny: false },
+      61: { desc: 'Light Rain', emoji: '🌧️', sunny: false },
+      63: { desc: 'Rain', emoji: '🌧️', sunny: false },
+      65: { desc: 'Heavy Rain', emoji: '🌧️', sunny: false },
+      66: { desc: 'Freezing Rain', emoji: '🌨️', sunny: false },
+      67: { desc: 'Heavy Freezing Rain', emoji: '🌨️', sunny: false },
+      71: { desc: 'Light Snow', emoji: '🌨️', sunny: false },
+      73: { desc: 'Snow', emoji: '❄️', sunny: false },
+      75: { desc: 'Heavy Snow', emoji: '❄️', sunny: false },
+      77: { desc: 'Snow Grains', emoji: '❄️', sunny: false },
+      80: { desc: 'Rain Showers', emoji: '🌦️', sunny: false },
+      81: { desc: 'Moderate Showers', emoji: '🌧️', sunny: false },
+      82: { desc: 'Heavy Showers', emoji: '🌧️', sunny: false },
+      85: { desc: 'Snow Showers', emoji: '🌨️', sunny: false },
+      86: { desc: 'Heavy Snow Showers', emoji: '🌨️', sunny: false },
+      95: { desc: 'Thunderstorm', emoji: '⛈️', sunny: false },
+      96: { desc: 'Thunderstorm w/ Hail', emoji: '⛈️', sunny: false },
+      99: { desc: 'Thunderstorm w/ Heavy Hail', emoji: '⛈️', sunny: false },
+    };
+
+    // Track current markers and selected day
+    let markers = [];
+    let selectedDayIndex = 0;
+    
+    // Calculate days needed for forecast (up to next Sunday)
+    function calculateForecastDays() {
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+      
+      // Days until next Saturday (if today is Sat, use today = 0 days)
+      const daysToSat = dayOfWeek === 6 ? 0 : (6 - dayOfWeek);
+      // Days until next Sunday (if today is Sun, use today = 0 days)
+      const daysToSun = dayOfWeek === 0 ? 0 : (7 - dayOfWeek);
+      
+      return {
+        daysToSat,
+        daysToSun,
+        forecastDaysNeeded: Math.max(daysToSun + 1, 2) // At least 2 for today/tomorrow
+      };
+    }
+    
+    // Format date labels for tabs
+    function updateTabLabels() {
+      const today = new Date();
+      const { daysToSat, daysToSun } = calculateForecastDays();
+      
+      const satDate = new Date(today);
+      satDate.setDate(today.getDate() + daysToSat);
+      
+      const sunDate = new Date(today);
+      sunDate.setDate(today.getDate() + daysToSun);
+      
+      const formatDate = (date) => {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      };
+      
+      document.getElementById('satTab').textContent = `Saturday ${formatDate(satDate)}`;
+      document.getElementById('satTab').dataset.dayIndex = daysToSat;
+      
+      document.getElementById('sunTab').textContent = `Sunday ${formatDate(sunDate)}`;
+      document.getElementById('sunTab').dataset.dayIndex = daysToSun;
+    }
+
+    // Initialize map centered on PNW
+    const map = L.map('map').setView([47.5, -121.5], 7);
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Add legend
+    const legend = L.control({ position: 'topright' });
+    legend.onAdd = function() {
+      const div = L.DomUtil.create('div', 'legend');
+      div.innerHTML = `
+        <h4>Weather</h4>
+        <div class="legend-item"><span class="legend-emoji">☀️</span> Clear/Sunny</div>
+        <div class="legend-item"><span class="legend-emoji">🌤️</span> Mainly Clear</div>
+        <div class="legend-item"><span class="legend-emoji">⛅</span> Partly Cloudy</div>
+        <div class="legend-item"><span class="legend-emoji">☁️</span> Cloudy</div>
+        <div class="legend-item"><span class="legend-emoji">🌧️</span> Rain</div>
+        <div class="legend-item"><span class="legend-emoji">❄️</span> Snow</div>
+      `;
+      return div;
+    };
+    legend.addTo(map);
+
+    // Create custom emoji marker
+    function createEmojiIcon(emoji, isSunny) {
+      return L.divIcon({
+        html: `<div style="font-size: 2rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); filter: ${isSunny ? 'drop-shadow(0 0 8px gold)' : 'none'};">${emoji}</div>`,
+        className: 'emoji-marker',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+        popupAnchor: [0, -20]
+      });
+    }
+
+    async function fetchWeatherForCity(city, forecastDays) {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=America%2FLos_Angeles&forecast_days=${forecastDays}`;
+      
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        return {
+          ...city,
+          dailyData: data.daily,
+          currentTemp: Math.round(data.current.temperature_2m)
+        };
+      } catch (error) {
+        console.error(`Failed to fetch weather for ${city.name}:`, error);
+        return {
+          ...city,
+          dailyData: null,
+          currentTemp: '--'
+        };
+      }
+    }
+    
+    function getWeatherForDay(cityData, dayIndex) {
+      if (!cityData.dailyData || !cityData.dailyData.weather_code[dayIndex]) {
+        return {
+          weather: { desc: 'Unavailable', emoji: '❓', sunny: false },
+          highTemp: '--',
+          lowTemp: '--',
+          isSunny: false
+        };
+      }
+      
+      const weatherCode = cityData.dailyData.weather_code[dayIndex];
+      const weather = weatherCodes[weatherCode] || { desc: 'Unknown', emoji: '❓', sunny: false };
+      
+      return {
+        weather,
+        highTemp: Math.round(cityData.dailyData.temperature_2m_max[dayIndex]),
+        lowTemp: Math.round(cityData.dailyData.temperature_2m_min[dayIndex]),
+        isSunny: weather.sunny
+      };
+    }
+    
+    // Store fetched data globally
+    let allCityData = [];
+    
+    function clearMarkers() {
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+    }
+    
+    function displayWeatherForDay(dayIndex) {
+      clearMarkers();
+      selectedDayIndex = dayIndex;
+      
+      const isToday = dayIndex === 0;
+      
+      allCityData.forEach(cityData => {
+        const dayWeather = getWeatherForDay(cityData, dayIndex);
+        const icon = createEmojiIcon(dayWeather.weather.emoji, dayWeather.isSunny);
+        const marker = L.marker([cityData.lat, cityData.lon], { icon }).addTo(map);
+        
+        const tempDisplay = isToday 
+          ? `Currently: ${cityData.currentTemp}°F<br>High: ${dayWeather.highTemp}°F / Low: ${dayWeather.lowTemp}°F`
+          : `High: ${dayWeather.highTemp}°F / Low: ${dayWeather.lowTemp}°F`;
+        
+        marker.bindPopup(`
+          <div class="city-popup">
+            <h3>${cityData.name}</h3>
+            <div class="weather-emoji">${dayWeather.weather.emoji}</div>
+            <div class="conditions">${dayWeather.weather.desc}</div>
+            <div class="temp">${tempDisplay}</div>
+            ${dayWeather.isSunny ? '<p style="color: gold; font-weight: bold; margin-top: 0.5rem;">☀️ Sunny!</p>' : ''}
+          </div>
+        `);
+        
+        markers.push(marker);
+      });
+      
+      // Log sunny cities
+      const sunnyCities = allCityData.filter(c => getWeatherForDay(c, dayIndex).isSunny);
+      console.log(`Sunny cities for day ${dayIndex}:`, sunnyCities.map(c => c.name).join(', ') || 'None');
+    }
+
+    async function updateAllWeather() {
+      const loading = document.getElementById('loading');
+      loading.classList.remove('hidden');
+      
+      const { forecastDaysNeeded } = calculateForecastDays();
+      
+      // Fetch all city weather in parallel
+      const weatherPromises = cities.map(city => fetchWeatherForCity(city, forecastDaysNeeded));
+      allCityData = await Promise.all(weatherPromises);
+      
+      // Display weather for currently selected day
+      displayWeatherForDay(selectedDayIndex);
+      
+      // Update timestamp
+      document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+      
+      loading.classList.add('hidden');
+    }
+    
+    // Tab click handlers
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        let dayIndex;
+        const dayAttr = tab.dataset.day;
+        
+        if (dayAttr === 'sat') {
+          dayIndex = parseInt(tab.dataset.dayIndex);
+        } else if (dayAttr === 'sun') {
+          dayIndex = parseInt(tab.dataset.dayIndex);
+        } else {
+          dayIndex = parseInt(dayAttr);
+        }
+        
+        displayWeatherForDay(dayIndex);
+      });
+    });
+
+    // Initialize
+    updateTabLabels();
+    updateAllWeather();
+    
+    // Refresh every 15 minutes
+    setInterval(updateAllWeather, 15 * 60 * 1000);
+  </script>
+</body>
+</html>
