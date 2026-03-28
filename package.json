@@ -1,0 +1,24 @@
+{
+  "name": "sunshinefinder",
+  "version": "1.0.0",
+  "description": "Need a little sun?",
+  "main": "index.js",
+  "scripts": {
+    "screenshot": "node test/screenshot.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/calegeffre/SunshineFinder.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/calegeffre/SunshineFinder/issues"
+  },
+  "homepage": "https://github.com/calegeffre/SunshineFinder#readme",
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
+}

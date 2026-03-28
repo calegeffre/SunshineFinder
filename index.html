@@ -126,6 +126,65 @@
       font-weight: bold;
       color: #333;
     }
+    .top3-panel {
+      background: rgba(26, 26, 46, 0.95);
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 0.5rem;
+      min-width: 200px;
+      max-width: 250px;
+    }
+    .top3-panel h4 {
+      color: #ffd700;
+      margin-bottom: 0.75rem;
+      font-size: 0.95rem;
+      border-bottom: 1px solid #0f3460;
+      padding-bottom: 0.5rem;
+    }
+    .top3-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(15, 52, 96, 0.4);
+    }
+    .top3-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .top3-rank {
+      font-size: 1.2rem;
+      min-width: 26px;
+      text-align: center;
+    }
+    .top3-emoji {
+      font-size: 1.2rem;
+      min-width: 24px;
+      text-align: center;
+    }
+    .top3-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .top3-city {
+      font-weight: 600;
+      font-size: 0.88rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .top3-dist {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 0.1rem;
+    }
+    .top3-none {
+      color: #94a3b8;
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 0.5rem 0;
+    }
   </style>
 </head>
 <body>
@@ -205,6 +264,52 @@
       99: { desc: 'Thunderstorm w/ Heavy Hail', emoji: '⛈️', sunny: false },
     };
 
+    // Fallback weather descriptor for unrecognised WMO codes
+    const UNKNOWN_WEATHER = { desc: 'Unknown', emoji: '❓', sunny: false };
+    const SEATTLE_LAT = 47.6062;
+    const SEATTLE_LON = -122.3321;
+
+    // Additional outdoor activity hub towns used when main cities don't provide 3 sunny spots
+    const fallbackCities = [
+      { name: 'Sequim', lat: 48.0751, lon: -123.1068 },
+      { name: 'Anacortes', lat: 48.5126, lon: -122.6127 },
+      { name: 'Mount Vernon', lat: 48.4218, lon: -122.3340 },
+      { name: 'Wenatchee', lat: 47.4235, lon: -120.3103 },
+      { name: 'Ellensburg', lat: 46.9965, lon: -120.5478 },
+      { name: 'Chelan', lat: 47.8360, lon: -120.0180 },
+      { name: 'Yakima', lat: 46.6021, lon: -120.5059 },
+      { name: 'Centralia', lat: 46.7162, lon: -122.9543 },
+      { name: 'Hood River', lat: 45.7054, lon: -121.5219 },
+      { name: 'Kelso', lat: 46.1468, lon: -122.9065 },
+      { name: 'Astoria', lat: 46.1879, lon: -123.8313 },
+      { name: 'The Dalles', lat: 45.5946, lon: -121.1787 },
+      { name: 'Coeur d\'Alene', lat: 47.6777, lon: -116.7805 },
+      { name: 'Tri-Cities', lat: 46.2396, lon: -119.1006 },
+      { name: 'Sandpoint', lat: 48.2766, lon: -116.5534 },
+      { name: 'Missoula', lat: 46.8721, lon: -113.9940 },
+      { name: 'Boise', lat: 43.6150, lon: -116.2023 },
+      { name: 'Medford', lat: 42.3265, lon: -122.8756 },
+    ];
+
+    // Cache fetched fallback city data to avoid re-fetching on tab switches
+    let fallbackCityCache = {};
+
+    // Haversine formula: straight-line distance in miles between two lat/lon points
+    function distanceMiles(lat1, lon1, lat2, lon2) {
+      const R = 3958.8; // Earth's mean radius in miles
+      const toRad = x => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // Returns true for WMO codes that qualify as "partly sunny or better" (codes 0, 1, 2)
+    function isPartlySunnyOrBetter(code) {
+      return code === 0 || code === 1 || code === 2;
+    }
+
     // Track current markers and selected day
     let markers = [];
     let selectedDayIndex = 0;
@@ -274,6 +379,92 @@
     };
     legend.addTo(map);
 
+    // Top 3 Closest Sunshine panel (topleft)
+    const top3Control = L.control({ position: 'topleft' });
+    top3Control.onAdd = function() {
+      const div = L.DomUtil.create('div', 'top3-panel');
+      div.innerHTML = `
+        <h4>🏆 3 Closest Sunny Spots</h4>
+        <div id="top3Content"><div class="top3-none">Loading...</div></div>
+      `;
+      return div;
+    };
+    top3Control.addTo(map);
+
+    // Update the Top 3 Closest Sunshine panel for the given day
+    async function updateTop3Panel(dayIndex) {
+      const panel = document.getElementById('top3Content');
+      if (!panel) return;
+
+      panel.innerHTML = '<div class="top3-none">Searching...</div>';
+
+      const { forecastDaysNeeded } = calculateForecastDays();
+
+      // Collect qualifying spots from the already-fetched main cities
+      const qualifying = allCityData
+        .filter(c => c.dailyData && isPartlySunnyOrBetter(c.dailyData.weather_code[dayIndex]))
+        .map(c => ({
+          name: c.name,
+          lat: c.lat,
+          lon: c.lon,
+          weatherCode: c.dailyData.weather_code[dayIndex],
+          distance: distanceMiles(SEATTLE_LAT, SEATTLE_LON, c.lat, c.lon)
+        }))
+        .sort((a, b) => a.distance - b.distance);
+
+      let top3 = qualifying.slice(0, 3);
+
+      // If fewer than 3 found, expand search to fallback outdoor-hub cities
+      if (top3.length < 3) {
+        const alreadyFetched = new Set(allCityData.map(c => c.name));
+        const fallbacksSorted = fallbackCities
+          .filter(c => !alreadyFetched.has(c.name))
+          .map(c => ({ ...c, distance: distanceMiles(SEATTLE_LAT, SEATTLE_LON, c.lat, c.lon) }))
+          .sort((a, b) => a.distance - b.distance);
+
+        for (const city of fallbacksSorted) {
+          if (top3.length >= 3) break;
+
+          // Use cached result if available
+          let cityData = fallbackCityCache[city.name];
+          if (!cityData) {
+            cityData = await fetchWeatherForCity(city, forecastDaysNeeded);
+            fallbackCityCache[city.name] = cityData;
+          }
+
+          if (cityData.dailyData && isPartlySunnyOrBetter(cityData.dailyData.weather_code[dayIndex])) {
+            top3.push({
+              name: city.name,
+              lat: city.lat,
+              lon: city.lon,
+              weatherCode: cityData.dailyData.weather_code[dayIndex],
+              distance: city.distance
+            });
+          }
+        }
+      }
+
+      if (top3.length === 0) {
+        panel.innerHTML = '<div class="top3-none">No sunny spots found 😔</div>';
+        return;
+      }
+
+      const medals = ['🥇', '🥈', '🥉'];
+      panel.innerHTML = top3.map((city, i) => {
+        const weather = weatherCodes[city.weatherCode] || UNKNOWN_WEATHER;
+        return `
+          <div class="top3-item">
+            <span class="top3-rank">${medals[i]}</span>
+            <span class="top3-emoji">${weather.emoji}</span>
+            <div class="top3-info">
+              <div class="top3-city">${city.name}</div>
+              <div class="top3-dist">${Math.round(city.distance)} mi from Seattle</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     // Create custom emoji marker
     function createEmojiIcon(emoji, isSunny) {
       return L.divIcon({
@@ -308,7 +499,7 @@
     }
     
     function getWeatherForDay(cityData, dayIndex) {
-      if (!cityData.dailyData || !cityData.dailyData.weather_code[dayIndex]) {
+      if (!cityData.dailyData || cityData.dailyData.weather_code[dayIndex] === undefined) {
         return {
           weather: { desc: 'Unavailable', emoji: '❓', sunny: false },
           highTemp: '--',
@@ -318,7 +509,7 @@
       }
       
       const weatherCode = cityData.dailyData.weather_code[dayIndex];
-      const weather = weatherCodes[weatherCode] || { desc: 'Unknown', emoji: '❓', sunny: false };
+      const weather = weatherCodes[weatherCode] || UNKNOWN_WEATHER;
       
       return {
         weather,
@@ -375,6 +566,9 @@
       
       const { forecastDaysNeeded } = calculateForecastDays();
       
+      // Clear fallback cache on each refresh so data stays fresh
+      fallbackCityCache = {};
+
       // Fetch all city weather in parallel
       const weatherPromises = cities.map(city => fetchWeatherForCity(city, forecastDaysNeeded));
       allCityData = await Promise.all(weatherPromises);
@@ -386,6 +580,9 @@
       document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
       
       loading.classList.add('hidden');
+
+      // Update Top 3 panel asynchronously (may fetch additional fallback data)
+      updateTop3Panel(selectedDayIndex);
     }
     
     // Tab click handlers
@@ -406,6 +603,7 @@
         }
         
         displayWeatherForDay(dayIndex);
+        updateTop3Panel(dayIndex);
       });
     });
 
