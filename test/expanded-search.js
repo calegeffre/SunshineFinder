@@ -105,7 +105,7 @@ function buildMockWeather(url) {
   const leafletCss = fs.readFileSync(path.join(VENDOR_DIR, 'leaflet.css'), 'utf8');
 
   const browser = await chromium.launch({
-    executablePath: '/usr/bin/chromium-browser',
+    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   });
 
@@ -138,7 +138,7 @@ function buildMockWeather(url) {
 
   await page.goto('file://' + INDEX_HTML);
 
-  // Wait for the panel to finish searching (no "Loading", "Searching", or "farther")
+  // Wait for the panel to finish searching (no "Loading" or "Searching")
   await page.waitForFunction(() => {
     const el = document.getElementById('top3Content');
     if (!el) return false;
