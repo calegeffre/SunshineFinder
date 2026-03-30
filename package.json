@@ -4,7 +4,8 @@
   "description": "Need a little sun?",
   "main": "index.js",
   "scripts": {
-    "screenshot": "node test/screenshot.js"
+    "screenshot": "node test/screenshot.js",
+    "test:expanded": "node test/expanded-search.js"
   },
   "repository": {
     "type": "git",

@@ -291,8 +291,59 @@
       { name: 'Medford', lat: 42.3265, lon: -122.8756 },
     ];
 
+    // Broader set of cities polled when main + fallback still yield fewer than 3 sunny spots.
+    // Sorted by the runtime distance calculation; defined here in rough geographic order.
+    const expandedCities = [
+      // Washington State coast / east (beyond main + fallback lists)
+      { name: 'Victoria BC',        lat: 48.4284, lon: -123.3656 },
+      { name: 'Aberdeen WA',        lat: 46.9759, lon: -123.8157 },
+      { name: 'Ocean Shores WA',    lat: 47.0043, lon: -124.1557 },
+      { name: 'Long Beach WA',      lat: 46.3518, lon: -124.0522 },
+      { name: 'Okanogan WA',        lat: 48.3601, lon: -119.5734 },
+      { name: 'Republic WA',        lat: 48.6498, lon: -118.7323 },
+      { name: 'Colville WA',        lat: 48.5465, lon: -117.9090 },
+      // Oregon (beyond Portland / Bend / Eugene / Medford)
+      { name: 'Salem OR',           lat: 44.9429, lon: -123.0351 },
+      { name: 'Grants Pass OR',     lat: 42.4393, lon: -123.3284 },
+      { name: 'Klamath Falls OR',   lat: 42.2249, lon: -121.7817 },
+      // British Columbia interior
+      { name: 'Kelowna BC',         lat: 49.8880, lon: -119.4960 },
+      { name: 'Kamloops BC',        lat: 50.6745, lon: -120.3273 },
+      { name: 'Prince George BC',   lat: 53.9171, lon: -122.7497 },
+      // Idaho (beyond Boise / Coeur d'Alene / Sandpoint)
+      { name: 'Moscow ID',          lat: 46.7324, lon: -117.0002 },
+      { name: 'Lewiston ID',        lat: 46.4165, lon: -117.0177 },
+      { name: 'Twin Falls ID',      lat: 42.5558, lon: -114.4607 },
+      // Montana (beyond Missoula)
+      { name: 'Kalispell MT',       lat: 48.1920, lon: -114.3168 },
+      { name: 'Helena MT',          lat: 46.5958, lon: -112.0270 },
+      { name: 'Great Falls MT',     lat: 47.5002, lon: -111.3008 },
+      { name: 'Billings MT',        lat: 45.7833, lon: -108.5007 },
+      // Alberta, Canada
+      { name: 'Calgary AB',         lat: 51.0447, lon: -114.0719 },
+      { name: 'Edmonton AB',        lat: 53.5461, lon: -113.4938 },
+      // Northern California
+      { name: 'Eureka CA',          lat: 40.8021, lon: -124.1637 },
+      { name: 'Redding CA',         lat: 40.5865, lon: -122.3917 },
+      // Nevada
+      { name: 'Reno NV',            lat: 39.5296, lon: -119.8138 },
+      // Central / Southern California
+      { name: 'Sacramento CA',      lat: 38.5816, lon: -121.4944 },
+      { name: 'San Francisco CA',   lat: 37.7749, lon: -122.4194 },
+      { name: 'Los Angeles CA',     lat: 34.0522, lon: -118.2437 },
+      { name: 'San Diego CA',       lat: 32.7157, lon: -117.1611 },
+      // Intermountain West
+      { name: 'Salt Lake City UT',  lat: 40.7608, lon: -111.8910 },
+      { name: 'Las Vegas NV',       lat: 36.1699, lon: -115.1398 },
+      { name: 'Phoenix AZ',         lat: 33.4484, lon: -112.0740 },
+      { name: 'Denver CO',          lat: 39.7392, lon: -104.9903 },
+    ];
+
     // Cache fetched fallback city data to avoid re-fetching on tab switches
     let fallbackCityCache = {};
+
+    // Cache fetched expanded city data to avoid re-fetching on tab switches
+    let expandedCityCache = {};
 
     // Haversine formula: straight-line distance in miles between two lat/lon points
     function distanceMiles(lat1, lon1, lat2, lon2) {
@@ -444,6 +495,45 @@
         }
       }
 
+      // If still fewer than 3, search progressively farther cities at expanding distances
+      if (top3.length < 3) {
+        const alreadySearched = new Set([
+          ...allCityData.map(c => c.name),
+          ...Object.keys(fallbackCityCache),
+        ]);
+        const expandedSorted = expandedCities
+          .filter(c => !alreadySearched.has(c.name))
+          .map(c => ({ ...c, distance: distanceMiles(SEATTLE_LAT, SEATTLE_LON, c.lat, c.lon) }))
+          .sort((a, b) => a.distance - b.distance);
+
+        if (expandedSorted.length > 0) {
+          panel.innerHTML = '<div class="top3-none">Searching further out...</div>';
+        }
+
+        for (const city of expandedSorted) {
+          if (top3.length >= 3) break;
+
+          let cityData = expandedCityCache[city.name];
+          if (!cityData) {
+            cityData = await fetchWeatherForCity(city, forecastDaysNeeded);
+            expandedCityCache[city.name] = cityData;
+          }
+
+          if (cityData.dailyData && isPartlySunnyOrBetter(cityData.dailyData.weather_code[dayIndex])) {
+            top3.push({
+              name: city.name,
+              lat: city.lat,
+              lon: city.lon,
+              weatherCode: cityData.dailyData.weather_code[dayIndex],
+              distance: city.distance,
+            });
+          }
+        }
+      }
+
+      // Sort by distance so medals always reflect true proximity to Seattle
+      top3.sort((a, b) => a.distance - b.distance);
+
       if (top3.length === 0) {
         panel.innerHTML = '<div class="top3-none">No sunny spots found 😔</div>';
         return;
@@ -568,6 +658,7 @@
       
       // Clear fallback cache on each refresh so data stays fresh
       fallbackCityCache = {};
+      expandedCityCache = {};
 
       // Fetch all city weather in parallel
       const weatherPromises = cities.map(city => fetchWeatherForCity(city, forecastDaysNeeded));
