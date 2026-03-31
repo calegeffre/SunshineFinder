@@ -68,7 +68,6 @@
       margin: 0.5rem;
     }
     .legend h4 {
-      margin-bottom: 0.5rem;
       color: #ffd700;
     }
     .legend-item {
@@ -137,10 +136,7 @@
     }
     .top3-panel h4 {
       color: #ffd700;
-      margin-bottom: 0.75rem;
       font-size: 0.95rem;
-      border-bottom: 1px solid #0f3460;
-      padding-bottom: 0.5rem;
     }
     .top3-item {
       display: flex;
@@ -185,6 +181,73 @@
       text-align: center;
       padding: 0.5rem 0;
     }
+    /* Collapsible panel styles */
+    .panel-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .top3-panel .panel-header {
+      border-bottom: 1px solid #0f3460;
+      padding-bottom: 0.5rem;
+    }
+    .top3-panel.panel-collapsed .panel-header {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .panel-toggle {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-left: 0.5rem;
+      display: inline-block;
+      transition: transform 0.2s;
+      line-height: 1;
+    }
+    .panel-collapsed .panel-toggle {
+      transform: rotate(-90deg);
+    }
+    .panel-body {
+      overflow: hidden;
+      transition: max-height 0.25s ease, margin-top 0.25s ease;
+      max-height: 600px;
+      margin-top: 0.75rem;
+    }
+    .legend .panel-body {
+      margin-top: 0.5rem;
+    }
+    .panel-collapsed .panel-body {
+      max-height: 0;
+      margin-top: 0;
+    }
+    /* Mobile optimizations */
+    @media (max-width: 640px) {
+      header {
+        padding: 0.6rem 1rem;
+      }
+      h1 {
+        font-size: 1.3rem;
+      }
+      .subtitle {
+        font-size: 0.8rem;
+      }
+      .tabs {
+        margin-top: 0.5rem;
+        gap: 0.3rem;
+      }
+      .tab {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+      }
+      #map {
+        height: calc(100vh - 130px);
+      }
+      .top3-panel,
+      .legend {
+        padding: 0.6rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -212,6 +275,8 @@
   </footer>
 
   <script>
+    const MOBILE_BREAKPOINT = '(max-width: 640px)';
+
     // Pacific Northwest cities with coordinates
     const cities = [
       { name: 'Seattle', lat: 47.6062, lon: -122.3321 },
@@ -417,15 +482,24 @@
     const legend = L.control({ position: 'topright' });
     legend.onAdd = function() {
       const div = L.DomUtil.create('div', 'legend');
+      const isMobile = window.matchMedia(MOBILE_BREAKPOINT).matches;
       div.innerHTML = `
-        <h4>Weather</h4>
-        <div class="legend-item"><span class="legend-emoji">☀️</span> Clear/Sunny</div>
-        <div class="legend-item"><span class="legend-emoji">🌤️</span> Mainly Clear</div>
-        <div class="legend-item"><span class="legend-emoji">⛅</span> Partly Cloudy</div>
-        <div class="legend-item"><span class="legend-emoji">☁️</span> Cloudy</div>
-        <div class="legend-item"><span class="legend-emoji">🌧️</span> Rain</div>
-        <div class="legend-item"><span class="legend-emoji">❄️</span> Snow</div>
+        <div class="panel-header">
+          <h4>Weather</h4><span class="panel-toggle">▼</span>
+        </div>
+        <div class="panel-body">
+          <div class="legend-item"><span class="legend-emoji">☀️</span> Clear/Sunny</div>
+          <div class="legend-item"><span class="legend-emoji">🌤️</span> Mainly Clear</div>
+          <div class="legend-item"><span class="legend-emoji">⛅</span> Partly Cloudy</div>
+          <div class="legend-item"><span class="legend-emoji">☁️</span> Cloudy</div>
+          <div class="legend-item"><span class="legend-emoji">🌧️</span> Rain</div>
+          <div class="legend-item"><span class="legend-emoji">❄️</span> Snow</div>
+        </div>
       `;
+      if (isMobile) div.classList.add('panel-collapsed');
+      L.DomEvent.on(div.querySelector('.panel-header'), 'click', function() {
+        div.classList.toggle('panel-collapsed');
+      });
       return div;
     };
     legend.addTo(map);
@@ -434,10 +508,19 @@
     const top3Control = L.control({ position: 'topleft' });
     top3Control.onAdd = function() {
       const div = L.DomUtil.create('div', 'top3-panel');
+      const isMobile = window.matchMedia(MOBILE_BREAKPOINT).matches;
       div.innerHTML = `
-        <h4>🏆 3 Closest Sunny Spots</h4>
-        <div id="top3Content"><div class="top3-none">Loading...</div></div>
+        <div class="panel-header">
+          <h4>🏆 3 Closest Sunny Spots</h4><span class="panel-toggle">▼</span>
+        </div>
+        <div class="panel-body">
+          <div id="top3Content"><div class="top3-none">Loading...</div></div>
+        </div>
       `;
+      if (isMobile) div.classList.add('panel-collapsed');
+      L.DomEvent.on(div.querySelector('.panel-header'), 'click', function() {
+        div.classList.toggle('panel-collapsed');
+      });
       return div;
     };
     top3Control.addTo(map);
