@@ -468,10 +468,22 @@
       const today = new Date();
       const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
       
-      // Days until next Saturday (if today is Sat, use today = 0 days)
-      const daysToSat = dayOfWeek === 6 ? 0 : (6 - dayOfWeek);
-      // Days until next Sunday (if today is Sun, use today = 0 days)
-      const daysToSun = dayOfWeek === 0 ? 0 : (7 - dayOfWeek);
+      // Days until next Saturday/Sunday
+      // If today is already Sat or Sun, show NEXT week's weekend
+      let daysToSat, daysToSun;
+      if (dayOfWeek === 6) {
+        // Today is Saturday — show next Saturday (7 days) and next Sunday (8 days)
+        daysToSat = 7;
+        daysToSun = 8;
+      } else if (dayOfWeek === 0) {
+        // Today is Sunday — show next Saturday (6 days) and next Sunday (7 days)
+        daysToSat = 6;
+        daysToSun = 7;
+      } else {
+        // Mon–Fri — show this coming Saturday and Sunday
+        daysToSat = 6 - dayOfWeek;
+        daysToSun = 7 - dayOfWeek;
+      }
       
       return {
         daysToSat,
