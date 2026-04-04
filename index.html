@@ -716,7 +716,7 @@
         };
       }
       
-      const weatherCode = cityData.dailyData.weather_code[dayIndex];
+      const weatherCode = bestSunnyCode(cityData, dayIndex) ?? cityData.dailyData.weather_code[dayIndex];
       const weather = weatherCodes[weatherCode] || UNKNOWN_WEATHER;
       
       return {
