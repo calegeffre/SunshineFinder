@@ -66,15 +66,25 @@ function buildMockWeather(url) {
   const weatherCodes = [];
   const maxTemps = [];
   const minTemps = [];
+  const hourlyTimes = [];
+  const hourlyCodes = [];
   const base = new Date('2026-03-28');
 
   for (let i = 0; i < forecastDays; i++) {
     const d = new Date(base);
     d.setDate(base.getDate() + i);
-    dates.push(d.toISOString().slice(0, 10));
-    weatherCodes.push(i === 0 ? code0 : code1);
+    const dateStr = d.toISOString().slice(0, 10);
+    dates.push(dateStr);
+    const dayCode = i === 0 ? code0 : code1;
+    weatherCodes.push(dayCode);
     maxTemps.push(55);
     minTemps.push(40);
+
+    // Generate 24 hourly entries per day, all matching the daily code
+    for (let h = 0; h < 24; h++) {
+      hourlyTimes.push(`${dateStr}T${String(h).padStart(2, '0')}:00`);
+      hourlyCodes.push(dayCode);
+    }
   }
 
   return {
@@ -93,6 +103,11 @@ function buildMockWeather(url) {
       weather_code: weatherCodes,
       temperature_2m_max: maxTemps,
       temperature_2m_min: minTemps,
+    },
+    hourly_units: { time: 'iso8601', weather_code: 'wmo code' },
+    hourly: {
+      time: hourlyTimes,
+      weather_code: hourlyCodes,
     },
   };
 }

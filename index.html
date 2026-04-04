@@ -426,6 +426,39 @@
       return code === 0 || code === 1 || code === 2;
     }
 
+    // Returns true if any hour in the given dayIndex has a sunny/partly-sunny code.
+    // Falls back to the daily code when hourly data is unavailable.
+    function hasSunnyHour(cityData, dayIndex) {
+      if (cityData.hourlyData && cityData.hourlyData.weather_code) {
+        const startHour = dayIndex * 24;
+        const endHour = startHour + 24;
+        const codes = cityData.hourlyData.weather_code;
+        for (let i = startHour; i < endHour && i < codes.length; i++) {
+          if (isPartlySunnyOrBetter(codes[i])) return true;
+        }
+        return false;
+      }
+      // Fallback: use daily code
+      return cityData.dailyData && isPartlySunnyOrBetter(cityData.dailyData.weather_code[dayIndex]);
+    }
+
+    // Returns the best (sunniest) hourly weather code for the given day, or the daily code as fallback.
+    function bestSunnyCode(cityData, dayIndex) {
+      if (cityData.hourlyData && cityData.hourlyData.weather_code) {
+        const startHour = dayIndex * 24;
+        const endHour = startHour + 24;
+        const codes = cityData.hourlyData.weather_code;
+        let best = null;
+        for (let i = startHour; i < endHour && i < codes.length; i++) {
+          if (isPartlySunnyOrBetter(codes[i])) {
+            if (best === null || codes[i] < best) best = codes[i];
+          }
+        }
+        if (best !== null) return best;
+      }
+      return cityData.dailyData ? cityData.dailyData.weather_code[dayIndex] : null;
+    }
+
     // Track current markers and selected day
     let markers = [];
     let selectedDayIndex = 0;
@@ -536,12 +569,12 @@
 
       // Collect qualifying spots from the already-fetched main cities
       const qualifying = allCityData
-        .filter(c => c.dailyData && isPartlySunnyOrBetter(c.dailyData.weather_code[dayIndex]))
+        .filter(c => c.dailyData && hasSunnyHour(c, dayIndex))
         .map(c => ({
           name: c.name,
           lat: c.lat,
           lon: c.lon,
-          weatherCode: c.dailyData.weather_code[dayIndex],
+          weatherCode: bestSunnyCode(c, dayIndex),
           distance: distanceMiles(SEATTLE_LAT, SEATTLE_LON, c.lat, c.lon)
         }))
         .sort((a, b) => a.distance - b.distance);
@@ -566,12 +599,12 @@
             fallbackCityCache[city.name] = cityData;
           }
 
-          if (cityData.dailyData && isPartlySunnyOrBetter(cityData.dailyData.weather_code[dayIndex])) {
+          if (hasSunnyHour(cityData, dayIndex)) {
             top3.push({
               name: city.name,
               lat: city.lat,
               lon: city.lon,
-              weatherCode: cityData.dailyData.weather_code[dayIndex],
+              weatherCode: bestSunnyCode(cityData, dayIndex),
               distance: city.distance
             });
           }
@@ -602,12 +635,12 @@
             expandedCityCache[city.name] = cityData;
           }
 
-          if (cityData.dailyData && isPartlySunnyOrBetter(cityData.dailyData.weather_code[dayIndex])) {
+          if (hasSunnyHour(cityData, dayIndex)) {
             top3.push({
               name: city.name,
               lat: city.lat,
               lon: city.lon,
-              weatherCode: cityData.dailyData.weather_code[dayIndex],
+              weatherCode: bestSunnyCode(cityData, dayIndex),
               distance: city.distance,
             });
           }
@@ -650,7 +683,7 @@
     }
 
     async function fetchWeatherForCity(city, forecastDays) {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=America%2FLos_Angeles&forecast_days=${forecastDays}`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&hourly=weather_code&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=America%2FLos_Angeles&forecast_days=${forecastDays}`;
       
       try {
         const response = await fetch(url);
@@ -659,6 +692,7 @@
         return {
           ...city,
           dailyData: data.daily,
+          hourlyData: data.hourly || null,
           currentTemp: Math.round(data.current.temperature_2m)
         };
       } catch (error) {
@@ -666,6 +700,7 @@
         return {
           ...city,
           dailyData: null,
+          hourlyData: null,
           currentTemp: '--'
         };
       }
@@ -688,7 +723,7 @@
         weather,
         highTemp: Math.round(cityData.dailyData.temperature_2m_max[dayIndex]),
         lowTemp: Math.round(cityData.dailyData.temperature_2m_min[dayIndex]),
-        isSunny: weather.sunny
+        isSunny: hasSunnyHour(cityData, dayIndex)
       };
     }
     
