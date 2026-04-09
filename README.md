@@ -2,7 +2,7 @@
 
 Need a little sun? SunshineFinder is an interactive weather map for the Pacific Northwest that shows you the **3 closest sunny spots** to Seattle right now — and for the next few days.
 
-![SunshineFinder preview](screenshots/preview.png)
+![SunshineFinder preview](https://github.com/user-attachments/assets/c00c158b-fa70-4fde-8f2b-9954866e29cc)
 
 ## What it does
 
