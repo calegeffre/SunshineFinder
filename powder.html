@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PNW Powder Finder</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+      padding: 1rem 2rem;
+      text-align: center;
+      border-bottom: 1px solid #0f3460;
+    }
+    h1 {
+      font-size: 1.8rem;
+      color: #87ceeb;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 0.6rem;
+      color: #ffd700;
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+    .back-link:hover { text-decoration: underline; }
+    main {
+      max-width: 960px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .resort-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+    .resort-card {
+      background: rgba(22, 33, 62, 0.95);
+      border: 1px solid #0f3460;
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .resort-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .resort-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #87ceeb;
+    }
+    .resort-elevation {
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-top: 0.1rem;
+    }
+    .days-row {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+    .day-cell {
+      flex: 1;
+      min-width: 48px;
+      background: rgba(15, 52, 96, 0.4);
+      border-radius: 8px;
+      padding: 0.5rem 0.3rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+    }
+    .day-cell.snowy {
+      background: rgba(135, 206, 235, 0.12);
+      border: 1px solid rgba(135, 206, 235, 0.35);
+    }
+    .day-label {
+      font-size: 0.68rem;
+      color: #94a3b8;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .day-emoji {
+      font-size: 1.3rem;
+      line-height: 1;
+    }
+    .day-snow {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #87ceeb;
+    }
+    .day-snow.none {
+      color: #475569;
+    }
+    .day-temp {
+      font-size: 0.68rem;
+      color: #94a3b8;
+    }
+    .total-snow {
+      font-size: 0.82rem;
+      color: #cbd5e1;
+      border-top: 1px solid #0f3460;
+      padding-top: 0.6rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .total-snow strong {
+      color: #87ceeb;
+      font-size: 1rem;
+    }
+    .loading-card {
+      color: #94a3b8;
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 1rem 0;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .error-msg {
+      color: #f87171;
+      font-size: 0.82rem;
+      text-align: center;
+      padding: 0.5rem 0;
+    }
+    footer {
+      background: #16213e;
+      padding: 0.75rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #64748b;
+      border-top: 1px solid #0f3460;
+      margin-top: 2rem;
+    }
+    @media (max-width: 640px) {
+      header { padding: 0.6rem 1rem; }
+      h1 { font-size: 1.3rem; }
+      .subtitle { font-size: 0.8rem; }
+      main { margin: 1rem auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>❄️ PNW Powder Finder</h1>
+    <p class="subtitle">7-day snow forecast for PNW ski resorts</p>
+    <a href="index.html" class="back-link">☀️ Back to Sunshine Finder</a>
+  </header>
+
+  <main>
+    <div class="resort-grid" id="resortGrid">
+      <!-- Cards injected by JS -->
+    </div>
+  </main>
+
+  <footer>
+    Data from <a href="https://open-meteo.com/" style="color:#87ceeb">Open-Meteo API</a> ·
+    Updated: <span id="lastUpdated">-</span>
+  </footer>
+
+  <script>
+    const resorts = [
+      { name: 'Whistler Blackcomb', location: 'Whistler, BC', lat: 50.1163, lon: -122.9574, elevation: '7,160 ft summit' },
+      { name: 'Stevens Pass',       location: 'Skykomish, WA', lat: 47.7448, lon: -121.0862, elevation: '5,845 ft summit' },
+      { name: 'Crystal Mountain',   location: 'Greenwater, WA', lat: 46.9286, lon: -121.4744, elevation: '7,012 ft summit' },
+      { name: 'Snoqualmie Pass',    location: 'Snoqualmie Pass, WA', lat: 47.4281, lon: -121.4116, elevation: '3,022 ft base' },
+      { name: 'Mission Ridge',      location: 'Wenatchee, WA', lat: 47.2970, lon: -120.3920, elevation: '6,770 ft summit' },
+    ];
+
+    // WMO weather code → emoji/description
+    const weatherIcons = {
+      0:  { emoji: '☀️',  desc: 'Clear' },
+      1:  { emoji: '🌤️', desc: 'Mainly Clear' },
+      2:  { emoji: '⛅',  desc: 'Partly Cloudy' },
+      3:  { emoji: '☁️',  desc: 'Overcast' },
+      45: { emoji: '🌫️', desc: 'Fog' },
+      48: { emoji: '🌫️', desc: 'Icy Fog' },
+      51: { emoji: '🌦️', desc: 'Light Drizzle' },
+      53: { emoji: '🌦️', desc: 'Drizzle' },
+      55: { emoji: '🌧️', desc: 'Heavy Drizzle' },
+      61: { emoji: '🌧️', desc: 'Light Rain' },
+      63: { emoji: '🌧️', desc: 'Rain' },
+      65: { emoji: '🌧️', desc: 'Heavy Rain' },
+      71: { emoji: '❄️',  desc: 'Light Snow' },
+      73: { emoji: '❄️',  desc: 'Snow' },
+      75: { emoji: '❄️',  desc: 'Heavy Snow' },
+      77: { emoji: '🌨️', desc: 'Snow Grains' },
+      80: { emoji: '🌦️', desc: 'Rain Showers' },
+      81: { emoji: '🌧️', desc: 'Rain Showers' },
+      82: { emoji: '⛈️',  desc: 'Heavy Rain' },
+      85: { emoji: '🌨️', desc: 'Snow Showers' },
+      86: { emoji: '🌨️', desc: 'Heavy Snow Showers' },
+      95: { emoji: '⛈️',  desc: 'Thunderstorm' },
+      96: { emoji: '⛈️',  desc: 'Thunderstorm + Hail' },
+      99: { emoji: '⛈️',  desc: 'Thunderstorm + Hail' },
+    };
+
+    function isSnowCode(code) {
+      return [71, 73, 75, 77, 85, 86].includes(code);
+    }
+
+    function cmToInches(cm) {
+      return cm / 2.54;
+    }
+
+    function formatSnow(inches) {
+      if (inches < 0.1) return null;
+      return inches < 1 ? `${(inches * 10 | 0) / 10}"` : `${Math.round(inches)}"`;
+    }
+
+    function shortDayLabel(dateStr, index) {
+      if (index === 0) return 'Today';
+      if (index === 1) return 'Tmrw';
+      const d = new Date(dateStr + 'T12:00:00');
+      return d.toLocaleDateString('en-US', { weekday: 'short' });
+    }
+
+    async function fetchSnowForecast(resort) {
+      const url = `https://api.open-meteo.com/v1/forecast` +
+        `?latitude=${resort.lat}&longitude=${resort.lon}` +
+        `&daily=weather_code,temperature_2m_max,temperature_2m_min,snowfall_sum` +
+        `&temperature_unit=fahrenheit` +
+        `&timezone=America%2FLos_Angeles` +
+        `&forecast_days=7`;
+      const res = await fetch(url);
+      return res.json();
+    }
+
+    function buildCard(resort) {
+      const card = document.createElement('div');
+      card.className = 'resort-card';
+      card.id = `card-${resort.name.replace(/\s+/g, '-')}`;
+      card.innerHTML = `
+        <div class="resort-header">
+          <div>
+            <div class="resort-name">⛷️ ${resort.name}</div>
+            <div class="resort-elevation">${resort.location} · ${resort.elevation}</div>
+          </div>
+        </div>
+        <div class="loading-card">Loading forecast…</div>
+      `;
+      return card;
+    }
+
+    function populateCard(card, resort, data) {
+      const daily = data.daily;
+      const days = daily.time; // array of date strings
+
+      let totalSnowIn = 0;
+      const cells = days.map((dateStr, i) => {
+        const code = daily.weather_code[i];
+        const snowCm = daily.snowfall_sum[i] || 0;
+        const snowIn = cmToInches(snowCm);
+        totalSnowIn += snowIn;
+        const snowLabel = formatSnow(snowIn);
+        const icon = weatherIcons[code] || { emoji: '❓', desc: 'Unknown' };
+        const hi = Math.round(daily.temperature_2m_max[i]);
+        const lo = Math.round(daily.temperature_2m_min[i]);
+        const isSnowy = snowIn >= 0.1;
+
+        return `
+          <div class="day-cell${isSnowy ? ' snowy' : ''}">
+            <div class="day-label">${shortDayLabel(dateStr, i)}</div>
+            <div class="day-emoji">${icon.emoji}</div>
+            <div class="day-snow${snowLabel ? '' : ' none'}">${snowLabel || '—'}</div>
+            <div class="day-temp">${hi}°/${lo}°</div>
+          </div>
+        `;
+      }).join('');
+
+      const totalLabel = totalSnowIn >= 0.1
+        ? `<strong>${Math.round(totalSnowIn * 10) / 10}"</strong> projected over 7 days`
+        : `<span style="color:#475569">No significant snow expected</span>`;
+
+      card.innerHTML = `
+        <div class="resort-header">
+          <div>
+            <div class="resort-name">⛷️ ${resort.name}</div>
+            <div class="resort-elevation">${resort.location} · ${resort.elevation}</div>
+          </div>
+        </div>
+        <div class="days-row">${cells}</div>
+        <div class="total-snow">❄️ 7-day total: ${totalLabel}</div>
+      `;
+    }
+
+    async function loadResort(resort, card) {
+      try {
+        const data = await fetchSnowForecast(resort);
+        populateCard(card, resort, data);
+      } catch (err) {
+        console.error(`Failed to fetch data for ${resort.name}:`, err);
+        card.querySelector('.loading-card')?.remove();
+        const errEl = document.createElement('div');
+        errEl.className = 'error-msg';
+        errEl.textContent = 'Failed to load forecast.';
+        card.appendChild(errEl);
+      }
+    }
+
+    async function init() {
+      const grid = document.getElementById('resortGrid');
+      const cards = resorts.map(resort => {
+        const card = buildCard(resort);
+        grid.appendChild(card);
+        return { resort, card };
+      });
+
+      await Promise.all(cards.map(({ resort, card }) => loadResort(resort, card)));
+      document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+    }
+
+    init();
+  </script>
+</body>
+</html>
