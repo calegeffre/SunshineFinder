@@ -215,17 +215,13 @@
       99: { emoji: '⛈️',  desc: 'Thunderstorm + Hail' },
     };
 
-    function isSnowCode(code) {
-      return [71, 73, 75, 77, 85, 86].includes(code);
-    }
-
     function cmToInches(cm) {
       return cm / 2.54;
     }
 
     function formatSnow(inches) {
       if (inches < 0.1) return null;
-      return inches < 1 ? `${(inches * 10 | 0) / 10}"` : `${Math.round(inches)}"`;
+      return inches < 1 ? `${Math.trunc(inches * 10) / 10}"` : `${Math.round(inches)}"`;
     }
 
     function shortDayLabel(dateStr, index) {
