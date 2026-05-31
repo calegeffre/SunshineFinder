@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PNW Wave Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #06111c;
+      color: #e2e8f0;
+    }
+    header {
+      background: linear-gradient(135deg, #0b2239 0%, #06111c 100%);
+      padding: 1rem 2rem;
+      text-align: center;
+      border-bottom: 1px solid #12385b;
+    }
+    h1 {
+      font-size: 1.8rem;
+      color: #67e8f9;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .subtitle a,
+    .header-link,
+    footer a {
+      color: #67e8f9;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .subtitle a:hover,
+    .header-link:hover,
+    footer a:hover {
+      text-decoration: underline;
+    }
+    .header-links {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+    }
+    .header-link.secondary {
+      color: #f8fafc;
+    }
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 0.6rem 1.2rem;
+      background: transparent;
+      border: 1px solid #12385b;
+      color: #94a3b8;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .tab:hover {
+      background: rgba(103, 232, 249, 0.1);
+      border-color: #67e8f9;
+      color: #67e8f9;
+    }
+    .tab.active {
+      background: #67e8f9;
+      color: #082032;
+      border-color: #67e8f9;
+      font-weight: 700;
+    }
+    #map {
+      height: calc(100vh - 198px);
+      width: 100%;
+    }
+    .map-panel {
+      background: rgba(6, 17, 28, 0.95);
+      border: 1px solid #12385b;
+      border-radius: 10px;
+      padding: 1rem;
+      margin: 0.5rem;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+    }
+    .map-panel h4 {
+      color: #67e8f9;
+      font-size: 0.96rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0.35rem 0;
+      font-size: 0.83rem;
+      color: #cbd5e1;
+    }
+    .legend-pill {
+      min-width: 54px;
+      border-radius: 999px;
+      padding: 0.2rem 0.5rem;
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #06111c;
+    }
+    .legend-small { background: #93c5fd; }
+    .legend-fun { background: #67e8f9; }
+    .legend-solid { background: #22d3ee; }
+    .legend-xl { background: #0284c7; color: #e0f2fe; }
+    .panel-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .panel-toggle {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-left: 0.5rem;
+      display: inline-block;
+      transition: transform 0.2s;
+      line-height: 1;
+    }
+    .panel-body {
+      overflow: hidden;
+      transition: max-height 0.25s ease, margin-top 0.25s ease;
+      max-height: 800px;
+      margin-top: 0.75rem;
+    }
+    .panel-collapsed .panel-body {
+      max-height: 0;
+      margin-top: 0;
+    }
+    .panel-collapsed .panel-toggle {
+      transform: rotate(-90deg);
+    }
+    .best-panel {
+      min-width: 245px;
+      max-width: 285px;
+    }
+    .best-card {
+      display: grid;
+      gap: 0.75rem;
+    }
+    .best-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.75rem;
+      border-bottom: 1px solid rgba(18, 56, 91, 0.8);
+      padding-bottom: 0.7rem;
+    }
+    .best-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .best-region {
+      margin-top: 0.2rem;
+      font-size: 0.78rem;
+      color: #94a3b8;
+    }
+    .best-badge {
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+    .best-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+    .metric {
+      background: rgba(14, 35, 56, 0.9);
+      border: 1px solid rgba(103, 232, 249, 0.14);
+      border-radius: 8px;
+      padding: 0.55rem;
+    }
+    .metric-label {
+      display: block;
+      color: #94a3b8;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.2rem;
+    }
+    .metric-value {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #f8fafc;
+      line-height: 1.35;
+    }
+    .best-note,
+    .legend-note,
+    .panel-empty {
+      color: #94a3b8;
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+    .runner-ups {
+      border-top: 1px solid rgba(18, 56, 91, 0.8);
+      padding-top: 0.7rem;
+    }
+    .runner-title {
+      color: #67e8f9;
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+    .runner-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      padding: 0.3rem 0;
+      color: #cbd5e1;
+    }
+    .runner-item strong {
+      color: #f8fafc;
+    }
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1000;
+      background: rgba(6, 17, 28, 0.96);
+      padding: 2rem;
+      border-radius: 12px;
+      text-align: center;
+      border: 1px solid rgba(103, 232, 249, 0.18);
+    }
+    .loading.hidden { display: none; }
+    .spinner {
+      font-size: 2rem;
+      animation: bob 1.2s ease-in-out infinite;
+      display: inline-block;
+    }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    .surf-popup {
+      text-align: center;
+      min-width: 210px;
+    }
+    .surf-popup h3 {
+      margin-bottom: 0.4rem;
+      color: #082032;
+    }
+    .surf-popup .wave-emoji {
+      font-size: 2rem;
+      line-height: 1;
+    }
+    .surf-popup .conditions {
+      color: #475569;
+      font-size: 0.88rem;
+      margin-top: 0.25rem;
+    }
+    .surf-popup .stats {
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 0.45rem;
+      line-height: 1.5;
+    }
+    .surf-popup .tides {
+      margin-top: 0.55rem;
+      color: #334155;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    .surf-popup .best-flag {
+      color: #0284c7;
+      font-weight: 700;
+      margin-top: 0.55rem;
+    }
+    .surf-marker {
+      min-width: 56px;
+      padding: 0.3rem 0.4rem;
+      border-radius: 999px;
+      background: rgba(6, 17, 28, 0.94);
+      border: 1px solid rgba(103, 232, 249, 0.42);
+      color: #e0f2fe;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.28rem;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    }
+    .surf-marker.best {
+      border-color: #f8fafc;
+      box-shadow: 0 0 0 2px rgba(103, 232, 249, 0.3), 0 10px 24px rgba(0, 0, 0, 0.4);
+    }
+    .surf-marker-height {
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    footer {
+      background: #0b2239;
+      padding: 0.75rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      border-top: 1px solid #12385b;
+    }
+    @media (max-width: 640px) {
+      header { padding: 0.7rem 1rem; }
+      h1 { font-size: 1.3rem; }
+      .subtitle { font-size: 0.82rem; }
+      .tabs { gap: 0.35rem; margin-top: 0.75rem; }
+      .tab { padding: 0.45rem 0.8rem; font-size: 0.8rem; }
+      #map { height: calc(100vh - 182px); }
+      .map-panel { padding: 0.75rem; }
+      .best-panel { min-width: 210px; max-width: 245px; }
+      .best-metrics { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🏄 PNW Wave Finder</h1>
+    <p class="subtitle">
+      Wave outlook across Washington and Oregon surf spots ·
+      <a href="powder.html">❄️ Find the Snow</a> ·
+      <a href="index.html">☀️ Sunshine Finder</a>
+    </p>
+    <div class="header-links">
+      <a href="https://open-meteo.com/en/docs/marine-weather-api" class="header-link" target="_blank" rel="noreferrer">Open-Meteo Marine</a>
+      <a href="https://tidesandcurrents.noaa.gov/" class="header-link secondary" target="_blank" rel="noreferrer">NOAA Tides</a>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-day="0">Today</button>
+      <button class="tab" data-day="1">Tomorrow</button>
+      <button class="tab" data-day="sat" id="satTab">Saturday</button>
+      <button class="tab" data-day="sun" id="sunTab">Sunday</button>
+    </div>
+  </header>
+
+  <div id="map"></div>
+
+  <div class="loading" id="loading">
+    <div class="spinner">🌊</div>
+    <p>Checking the swell...</p>
+  </div>
+
+  <footer>
+    Wave data from <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo Marine API</a> •
+    Tide data from <a href="https://tidesandcurrents.noaa.gov/" target="_blank" rel="noreferrer">NOAA Tides &amp; Currents</a> •
+    Updated: <span id="lastUpdated">-</span>
+  </footer>
+
+  <script>
+    const MOBILE_BREAKPOINT = '(max-width: 640px)';
+
+    const surfSpots = [
+      { name: 'Westport', region: 'Washington', note: 'Westhaven / Half Moon Bay', lat: 46.8901, lon: -124.1087, tideStationId: '9441102', tideStationName: 'Westport' },
+      { name: 'Ocean Shores', region: 'Washington', note: 'Damon Point / beach break', lat: 47.0087, lon: -124.1618, tideStationId: '9441102', tideStationName: 'Westport' },
+      { name: 'La Push', region: 'Washington', note: 'First Beach / Rialto zone', lat: 47.9110, lon: -124.6350, tideStationId: '9442396', tideStationName: 'La Push, Quillayute River' },
+      { name: 'Neah Bay', region: 'Washington', note: 'Cape Flattery exposure', lat: 48.3707, lon: -124.6250, tideStationId: '9443090', tideStationName: 'Neah Bay' },
+      { name: 'Long Beach', region: 'Washington', note: 'South Washington beach break', lat: 46.3527, lon: -124.0554, tideStationId: '9439040', tideStationName: 'Astoria' },
+      { name: 'Cannon Beach', region: 'Oregon', note: 'North Oregon point and beach mix', lat: 45.8918, lon: -123.9615, tideStationId: '9439040', tideStationName: 'Astoria' },
+      { name: 'Pacific City', region: 'Oregon', note: 'Cape Kiwanda', lat: 45.2032, lon: -123.9629, tideStationId: '9437540', tideStationName: 'Garibaldi' },
+      { name: 'Newport', region: 'Oregon', note: 'South Beach / Agate zone', lat: 44.6368, lon: -124.0530, tideStationId: '9435380', tideStationName: 'South Beach' }
+    ];
+
+    let allSpotData = [];
+    let markers = [];
+    let selectedDayIndex = 0;
+
+    function calculateForecastDays() {
+      const today = new Date();
+      const dayOfWeek = today.getDay();
+
+      let daysToSat;
+      let daysToSun;
+
+      if (dayOfWeek === 6) {
+        daysToSat = 7;
+        daysToSun = 8;
+      } else if (dayOfWeek === 0) {
+        daysToSat = 6;
+        daysToSun = 7;
+      } else {
+        daysToSat = 6 - dayOfWeek;
+        daysToSun = 7 - dayOfWeek;
+      }
+
+      return {
+        daysToSat,
+        daysToSun,
+        forecastDaysNeeded: Math.max(daysToSun + 1, 2)
+      };
+    }
+
+    function updateTabLabels() {
+      const today = new Date();
+      const { daysToSat, daysToSun } = calculateForecastDays();
+      const satDate = new Date(today);
+      const sunDate = new Date(today);
+
+      satDate.setDate(today.getDate() + daysToSat);
+      sunDate.setDate(today.getDate() + daysToSun);
+
+      const formatDate = (date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      document.getElementById('satTab').textContent = `Saturday ${formatDate(satDate)}`;
+      document.getElementById('satTab').dataset.dayIndex = String(daysToSat);
+      document.getElementById('sunTab').textContent = `Sunday ${formatDate(sunDate)}`;
+      document.getElementById('sunTab').dataset.dayIndex = String(daysToSun);
+    }
+
+    function formatApiDate(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}${month}${day}`;
+    }
+
+    function metersToFeet(value) {
+      return Number(value) * 3.28084;
+    }
+
+    function formatWaveHeight(value) {
+      const feet = metersToFeet(value);
+      return Number.isFinite(feet) ? `${feet.toFixed(1)} ft` : 'N/A';
+    }
+
+    function formatWaveHeightShort(value) {
+      const feet = metersToFeet(value);
+      if (!Number.isFinite(feet)) return 'N/A';
+      return `${feet.toFixed(feet >= 10 ? 0 : 1)}'`;
+    }
+
+    function directionToCompass(degrees) {
+      if (!Number.isFinite(Number(degrees))) return 'N/A';
+      const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      const normalized = ((Number(degrees) % 360) + 360) % 360;
+      return directions[Math.round(normalized / 22.5) % 16];
+    }
+
+    function formatWaveDirection(degrees) {
+      if (!Number.isFinite(Number(degrees))) return 'N/A';
+      return `${directionToCompass(degrees)} (${Math.round(Number(degrees))}°)`;
+    }
+
+    function formatWavePeriod(seconds) {
+      return Number.isFinite(Number(seconds)) ? `${Number(seconds).toFixed(1)} s` : 'N/A';
+    }
+
+    function getWaveBand(value) {
+      const feet = metersToFeet(value);
+      if (!Number.isFinite(feet)) {
+        return { label: 'No data', emoji: '❓' };
+      }
+      if (feet >= 7) return { label: 'XL swell', emoji: '🌊' };
+      if (feet >= 5) return { label: 'Pumping', emoji: '🏄' };
+      if (feet >= 3) return { label: 'Fun surf', emoji: '🌊' };
+      return { label: 'Small', emoji: '🌤️' };
+    }
+
+    function formatNoaaTime(timestamp) {
+      if (!timestamp) return 'N/A';
+      const [datePart, timePart] = timestamp.split(' ');
+      if (!datePart || !timePart) return timestamp;
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hourText, minuteText] = timePart.split(':');
+      const date = new Date(year, month - 1, day, Number(hourText), Number(minuteText));
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+
+    function createEmojiIcon(heightValue, isBest) {
+      const band = getWaveBand(heightValue);
+      return L.divIcon({
+        html: `
+          <div class="surf-marker${isBest ? ' best' : ''}">
+            <span>${isBest ? '🏄' : band.emoji}</span>
+            <span class="surf-marker-height">${formatWaveHeightShort(heightValue)}</span>
+          </div>
+        `,
+        className: 'surf-marker-shell',
+        iconSize: [68, 34],
+        iconAnchor: [34, 17],
+        popupAnchor: [0, -18]
+      });
+    }
+
+    function groupTidePredictions(predictions) {
+      return predictions.reduce((grouped, prediction) => {
+        const [date] = prediction.t.split(' ');
+        if (!grouped[date]) {
+          grouped[date] = { highs: [], lows: [] };
+        }
+
+        const event = {
+          time: prediction.t,
+          value: Number(prediction.v)
+        };
+
+        if (prediction.type === 'H') {
+          grouped[date].highs.push(event);
+        } else if (prediction.type === 'L') {
+          grouped[date].lows.push(event);
+        }
+
+        return grouped;
+      }, {});
+    }
+
+    function pickHighTide(dayTides) {
+      if (!dayTides?.highs?.length) return null;
+      return dayTides.highs.reduce((best, current) => current.value > best.value ? current : best);
+    }
+
+    function pickLowTide(dayTides) {
+      if (!dayTides?.lows?.length) return null;
+      return dayTides.lows.reduce((best, current) => current.value < best.value ? current : best);
+    }
+
+    async function fetchWaveForecast(spot, forecastDays) {
+      const params = new URLSearchParams({
+        latitude: String(spot.lat),
+        longitude: String(spot.lon),
+        daily: 'wave_height_max,wave_direction_dominant,wave_period_max',
+        timezone: 'America/Los_Angeles',
+        forecast_days: String(forecastDays)
+      });
+
+      const response = await fetch(`https://marine-api.open-meteo.com/v1/marine?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Wave request failed for ${spot.name}`);
+      }
+
+      const data = await response.json();
+      return data.daily;
+    }
+
+    async function fetchTidesForStation(stationId, endDate) {
+      const params = new URLSearchParams({
+        product: 'predictions',
+        datum: 'MLLW',
+        station: stationId,
+        time_zone: 'lst_ldt',
+        units: 'english',
+        interval: 'hilo',
+        format: 'json',
+        begin_date: formatApiDate(new Date()),
+        end_date: formatApiDate(endDate)
+      });
+
+      const response = await fetch(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Tide request failed for station ${stationId}`);
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error.message || `Tide request failed for station ${stationId}`);
+      }
+
+      return groupTidePredictions(data.predictions || []);
+    }
+
+    function getSpotForecastForDay(spotData, dayIndex) {
+      const daily = spotData.waveDaily;
+      if (!daily || daily.time[dayIndex] === undefined) {
+        return null;
+      }
+
+      const date = daily.time[dayIndex];
+      const dayTides = spotData.tidesByDate?.[date] || null;
+      const highTide = pickHighTide(dayTides);
+      const lowTide = pickLowTide(dayTides);
+      const waveHeight = daily.wave_height_max[dayIndex];
+      const wavePeriod = daily.wave_period_max[dayIndex];
+      const waveDirection = daily.wave_direction_dominant[dayIndex];
+      const band = getWaveBand(waveHeight);
+      const waveFeet = metersToFeet(waveHeight);
+
+      return {
+        date,
+        waveHeight,
+        waveFeet,
+        wavePeriod,
+        waveDirection,
+        highTide,
+        lowTide,
+        band,
+        score: Number.isFinite(waveFeet) ? (waveFeet * 100) + Number(wavePeriod || 0) : -1
+      };
+    }
+
+    function clearMarkers() {
+      markers.forEach((marker) => map.removeLayer(marker));
+      markers = [];
+    }
+
+    const map = L.map('map').setView([46.15, -124.25], 7);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+    const legend = L.control({ position: 'topright' });
+    legend.onAdd = function() {
+      const div = L.DomUtil.create('div', 'map-panel');
+      const isMobile = window.matchMedia(MOBILE_BREAKPOINT).matches;
+      div.innerHTML = `
+        <div class="panel-header">
+          <h4>Surf Guide</h4><span class="panel-toggle">▼</span>
+        </div>
+        <div class="panel-body">
+          <div class="legend-item"><span class="legend-pill legend-small">0-3 ft</span><span>Small / mellow</span></div>
+          <div class="legend-item"><span class="legend-pill legend-fun">3-5 ft</span><span>Fun surf</span></div>
+          <div class="legend-item"><span class="legend-pill legend-solid">5-7 ft</span><span>Solid / stronger push</span></div>
+          <div class="legend-item"><span class="legend-pill legend-xl">7+ ft</span><span>Largest swell on the map</span></div>
+          <p class="legend-note">Best Surf ranks spots by modeled daily max wave height, with wave period used as a tiebreaker. Tide times come from the nearest NOAA station for each spot.</p>
+        </div>
+      `;
+      if (isMobile) div.classList.add('panel-collapsed');
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
+      L.DomEvent.on(div.querySelector('.panel-header'), 'click', function() {
+        div.classList.toggle('panel-collapsed');
+      });
+      return div;
+    };
+    legend.addTo(map);
+
+    const bestSurfControl = L.control({ position: 'topleft' });
+    bestSurfControl.onAdd = function() {
+      const div = L.DomUtil.create('div', 'map-panel best-panel');
+      const isMobile = window.matchMedia(MOBILE_BREAKPOINT).matches;
+      div.innerHTML = `
+        <div class="panel-header">
+          <h4>🏄 Best Surf</h4><span class="panel-toggle">▼</span>
+        </div>
+        <div class="panel-body">
+          <div id="bestSurfContent"><div class="panel-empty">Loading surf lineup...</div></div>
+        </div>
+      `;
+      if (isMobile) div.classList.add('panel-collapsed');
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
+      L.DomEvent.on(div.querySelector('.panel-header'), 'click', function() {
+        div.classList.toggle('panel-collapsed');
+      });
+      return div;
+    };
+    bestSurfControl.addTo(map);
+
+    function updateBestSurfPanel(dayIndex) {
+      const panel = document.getElementById('bestSurfContent');
+      if (!panel) return;
+
+      const ranked = allSpotData
+        .map((spot) => ({ spot, summary: getSpotForecastForDay(spot, dayIndex) }))
+        .filter((entry) => entry.summary && Number.isFinite(entry.summary.waveFeet))
+        .sort((a, b) => b.summary.score - a.summary.score);
+
+      if (!ranked.length) {
+        panel.innerHTML = '<div class="panel-empty">No surf forecast available for that day.</div>';
+        return;
+      }
+
+      const best = ranked[0];
+      const runnersUp = ranked.slice(1, 3);
+
+      panel.innerHTML = `
+        <div class="best-card">
+          <div class="best-head">
+            <div>
+              <div class="best-name">${best.spot.name}</div>
+              <div class="best-region">${best.spot.region} · ${best.summary.band.label}</div>
+            </div>
+            <div class="best-badge">${best.summary.band.emoji}</div>
+          </div>
+          <div class="best-metrics">
+            <div class="metric">
+              <span class="metric-label">Wave max</span>
+              <div class="metric-value">${formatWaveHeight(best.summary.waveHeight)}</div>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Period</span>
+              <div class="metric-value">${formatWavePeriod(best.summary.wavePeriod)}</div>
+            </div>
+            <div class="metric">
+              <span class="metric-label">High tide</span>
+              <div class="metric-value">${best.summary.highTide ? `${formatNoaaTime(best.summary.highTide.time)} · ${best.summary.highTide.value.toFixed(1)} ft` : 'N/A'}</div>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Low tide</span>
+              <div class="metric-value">${best.summary.lowTide ? `${formatNoaaTime(best.summary.lowTide.time)} · ${best.summary.lowTide.value.toFixed(1)} ft` : 'N/A'}</div>
+            </div>
+          </div>
+          <p class="best-note">${best.spot.note}. Dominant swell direction is ${formatWaveDirection(best.summary.waveDirection)}.</p>
+          ${runnersUp.length ? `
+            <div class="runner-ups">
+              <div class="runner-title">Also worth a look</div>
+              ${runnersUp.map(({ spot, summary }) => `
+                <div class="runner-item">
+                  <strong>${spot.name}</strong>
+                  <span>${formatWaveHeightShort(summary.waveHeight)} · ${formatWavePeriod(summary.wavePeriod)}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function displaySurfForDay(dayIndex) {
+      selectedDayIndex = dayIndex;
+      clearMarkers();
+
+      const ranked = allSpotData
+        .map((spot) => ({ spot, summary: getSpotForecastForDay(spot, dayIndex) }))
+        .filter((entry) => entry.summary)
+        .sort((a, b) => b.summary.score - a.summary.score);
+
+      const bestSpotName = ranked[0]?.spot.name || null;
+
+      ranked.forEach(({ spot, summary }) => {
+        const icon = createEmojiIcon(summary.waveHeight, spot.name === bestSpotName);
+        const marker = L.marker([spot.lat, spot.lon], { icon }).addTo(map);
+
+        marker.bindPopup(`
+          <div class="surf-popup">
+            <h3>${spot.name}</h3>
+            <div class="wave-emoji">${spot.name === bestSpotName ? '🏄' : summary.band.emoji}</div>
+            <div class="conditions">${spot.region} · ${spot.note}</div>
+            <div class="stats">
+              Wave max: ${formatWaveHeight(summary.waveHeight)}<br>
+              Period: ${formatWavePeriod(summary.wavePeriod)}<br>
+              Direction: ${formatWaveDirection(summary.waveDirection)}
+            </div>
+            <div class="tides">
+              High tide: ${summary.highTide ? `${formatNoaaTime(summary.highTide.time)} (${summary.highTide.value.toFixed(1)} ft)` : 'N/A'}<br>
+              Low tide: ${summary.lowTide ? `${formatNoaaTime(summary.lowTide.time)} (${summary.lowTide.value.toFixed(1)} ft)` : 'N/A'}<br>
+              NOAA station: ${spot.tideStationName}
+            </div>
+            ${spot.name === bestSpotName ? '<div class="best-flag">Best surf on this map for the selected day</div>' : ''}
+          </div>
+        `);
+
+        markers.push(marker);
+      });
+
+      updateBestSurfPanel(dayIndex);
+    }
+
+    async function updateAllSurf() {
+      const loading = document.getElementById('loading');
+      loading.classList.remove('hidden');
+
+      const { forecastDaysNeeded, daysToSun } = calculateForecastDays();
+      const today = new Date();
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() + daysToSun);
+
+      const uniqueStationIds = [...new Set(surfSpots.map((spot) => spot.tideStationId))];
+
+      try {
+        const [waveResults, tideResults] = await Promise.all([
+          Promise.allSettled(surfSpots.map((spot) => fetchWaveForecast(spot, forecastDaysNeeded))),
+          Promise.allSettled(uniqueStationIds.map((stationId) => fetchTidesForStation(stationId, endDate)))
+        ]);
+
+        const tideByStation = Object.fromEntries(
+          uniqueStationIds.map((stationId, index) => [
+            stationId,
+            tideResults[index].status === 'fulfilled' ? tideResults[index].value : {}
+          ])
+        );
+
+        allSpotData = surfSpots.map((spot, index) => ({
+          ...spot,
+          waveDaily: waveResults[index].status === 'fulfilled' ? waveResults[index].value : null,
+          tidesByDate: tideByStation[spot.tideStationId] || {}
+        }));
+
+        const hasWaveData = allSpotData.some((spot) => Array.isArray(spot.waveDaily?.time) && spot.waveDaily.time.length);
+        if (!hasWaveData) {
+          throw new Error('No wave data returned');
+        }
+
+        displaySurfForDay(selectedDayIndex);
+        document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+      } catch (error) {
+        console.error('Failed to load surf data:', error);
+        document.getElementById('bestSurfContent').innerHTML = '<div class="panel-empty">Failed to load surf data right now.</div>';
+      } finally {
+        loading.classList.add('hidden');
+      }
+    }
+
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach((currentTab) => currentTab.classList.remove('active'));
+        tab.classList.add('active');
+
+        const dayAttr = tab.dataset.day;
+        const dayIndex = dayAttr === 'sat' || dayAttr === 'sun'
+          ? Number(tab.dataset.dayIndex)
+          : Number(dayAttr);
+
+        displaySurfForDay(dayIndex);
+      });
+    });
+
+    updateTabLabels();
+    updateAllSurf();
+    setInterval(updateAllSurf, 30 * 60 * 1000);
+  </script>
+</body>
+</html>
