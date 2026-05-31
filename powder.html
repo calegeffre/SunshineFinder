@@ -27,6 +27,12 @@
       color: #94a3b8;
       font-size: 0.9rem;
     }
+    .header-links {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
     .back-link {
       display: inline-block;
       margin-top: 0.6rem;
@@ -164,7 +170,10 @@
   <header>
     <h1>❄️ PNW Powder Finder</h1>
     <p class="subtitle">7-day snow forecast for PNW ski resorts</p>
-    <a href="index.html" class="back-link">☀️ Back to Sunshine Finder</a>
+    <div class="header-links">
+      <a href="https://nwac.us/" class="back-link" target="_blank" rel="noreferrer">NWAC Avalanche Forecast</a>
+      <a href="index.html" class="back-link">☀️ Back to Sunshine Finder</a>
+    </div>
   </header>
 
   <main>
