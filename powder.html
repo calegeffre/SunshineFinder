@@ -190,11 +190,14 @@
 
   <script>
     const resorts = [
-      { name: 'Whistler Blackcomb', location: 'Whistler, BC', lat: 50.1163, lon: -122.9574, elevation: '7,160 ft summit' },
-      { name: 'Stevens Pass',       location: 'Skykomish, WA', lat: 47.7448, lon: -121.0862, elevation: '5,845 ft summit' },
-      { name: 'Crystal Mountain',   location: 'Greenwater, WA', lat: 46.9286, lon: -121.4744, elevation: '7,012 ft summit' },
-      { name: 'Snoqualmie Pass',    location: 'Snoqualmie Pass, WA', lat: 47.4281, lon: -121.4116, elevation: '3,022 ft base' },
-      { name: 'Mission Ridge',      location: 'Wenatchee, WA', lat: 47.2970, lon: -120.3920, elevation: '6,770 ft summit' },
+      { name: 'Whistler Blackcomb', location: 'Whistler, BC', lat: 50.1163, lon: -122.9574, elevation: '7,160 ft summit', distFromSeattle: '280 mi' },
+      { name: 'Stevens Pass',       location: 'Skykomish, WA', lat: 47.7448, lon: -121.0862, elevation: '5,845 ft summit', distFromSeattle: '85 mi' },
+      { name: 'Crystal Mountain',   location: 'Greenwater, WA', lat: 46.9286, lon: -121.4744, elevation: '7,012 ft summit', distFromSeattle: '85 mi' },
+      { name: 'Snoqualmie Pass',    location: 'Snoqualmie Pass, WA', lat: 47.4281, lon: -121.4116, elevation: '3,022 ft base', distFromSeattle: '50 mi' },
+      { name: 'Mission Ridge',      location: 'Wenatchee, WA', lat: 47.2970, lon: -120.3920, elevation: '6,770 ft summit', distFromSeattle: '145 mi' },
+      { name: 'Mt. Baker',          location: 'Deming, WA', lat: 48.8566, lon: -121.6647, elevation: '5,089 ft summit', distFromSeattle: '140 mi' },
+      { name: 'White Pass',         location: 'Naches, WA', lat: 46.6370, lon: -121.3910, elevation: '6,500 ft summit', distFromSeattle: '145 mi' },
+      { name: 'Mt. Bachelor',       location: 'Bend, OR', lat: 43.9792, lon: -121.6886, elevation: '9,065 ft summit', distFromSeattle: '330 mi' },
     ];
 
     // WMO weather code → emoji/description
@@ -260,7 +263,7 @@
         <div class="resort-header">
           <div>
             <div class="resort-name">⛷️ ${resort.name}</div>
-            <div class="resort-elevation">${resort.location} · ${resort.elevation}</div>
+            <div class="resort-elevation">${resort.location} · ${resort.elevation} · 🚗 ${resort.distFromSeattle} from Seattle</div>
           </div>
         </div>
         <div class="loading-card">Loading forecast…</div>
@@ -302,7 +305,7 @@
         <div class="resort-header">
           <div>
             <div class="resort-name">⛷️ ${resort.name}</div>
-            <div class="resort-elevation">${resort.location} · ${resort.elevation}</div>
+            <div class="resort-elevation">${resort.location} · ${resort.elevation} · 🚗 ${resort.distFromSeattle} from Seattle</div>
           </div>
         </div>
         <div class="days-row">${cells}</div>
