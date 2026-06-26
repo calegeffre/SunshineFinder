@@ -436,7 +436,7 @@
     // Returns true if at least SUNNY_MAJORITY_THRESHOLD of daylight hours
     // (7 am–7 pm) for the given day have a partly-sunny-or-better code (0/1/2).
     // Falls back to the daily code when hourly data is unavailable.
-    function hasSunnyHour(cityData, dayIndex) {
+    function hasSufficientSunshine(cityData, dayIndex) {
       if (cityData.hourlyData && cityData.hourlyData.weather_code) {
         const dayStart = dayIndex * 24;
         const codes = cityData.hourlyData.weather_code;
@@ -460,7 +460,7 @@
     // Returns the dominant (most frequent) hourly weather code during daylight
     // hours (7 am–7 pm) for the given day, or the daily code as fallback.
     // Ties are broken by preferring the lower (sunnier) code.
-    function bestSunnyCode(cityData, dayIndex) {
+    function dominantDaylightCode(cityData, dayIndex) {
       if (cityData.hourlyData && cityData.hourlyData.weather_code) {
         const dayStart = dayIndex * 24;
         const codes = cityData.hourlyData.weather_code;
@@ -601,12 +601,12 @@
 
       // Collect qualifying spots from the already-fetched main cities
       const qualifying = allCityData
-        .filter(c => c.dailyData && hasSunnyHour(c, dayIndex))
+        .filter(c => c.dailyData && hasSufficientSunshine(c, dayIndex))
         .map(c => ({
           name: c.name,
           lat: c.lat,
           lon: c.lon,
-          weatherCode: bestSunnyCode(c, dayIndex),
+          weatherCode: dominantDaylightCode(c, dayIndex),
           distance: distanceMiles(SEATTLE_LAT, SEATTLE_LON, c.lat, c.lon)
         }))
         .sort((a, b) => a.distance - b.distance);
@@ -631,12 +631,12 @@
             fallbackCityCache[city.name] = cityData;
           }
 
-          if (hasSunnyHour(cityData, dayIndex)) {
+          if (hasSufficientSunshine(cityData, dayIndex)) {
             top3.push({
               name: city.name,
               lat: city.lat,
               lon: city.lon,
-              weatherCode: bestSunnyCode(cityData, dayIndex),
+              weatherCode: dominantDaylightCode(cityData, dayIndex),
               distance: city.distance
             });
           }
@@ -667,12 +667,12 @@
             expandedCityCache[city.name] = cityData;
           }
 
-          if (hasSunnyHour(cityData, dayIndex)) {
+          if (hasSufficientSunshine(cityData, dayIndex)) {
             top3.push({
               name: city.name,
               lat: city.lat,
               lon: city.lon,
-              weatherCode: bestSunnyCode(cityData, dayIndex),
+              weatherCode: dominantDaylightCode(cityData, dayIndex),
               distance: city.distance,
             });
           }
@@ -748,14 +748,14 @@
         };
       }
       
-      const weatherCode = bestSunnyCode(cityData, dayIndex) ?? cityData.dailyData.weather_code[dayIndex];
+      const weatherCode = dominantDaylightCode(cityData, dayIndex) ?? cityData.dailyData.weather_code[dayIndex];
       const weather = weatherCodes[weatherCode] || UNKNOWN_WEATHER;
       
       return {
         weather,
         highTemp: Math.round(cityData.dailyData.temperature_2m_max[dayIndex]),
         lowTemp: Math.round(cityData.dailyData.temperature_2m_min[dayIndex]),
-        isSunny: hasSunnyHour(cityData, dayIndex)
+        isSunny: hasSufficientSunshine(cityData, dayIndex)
       };
     }
     
