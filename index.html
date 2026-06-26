@@ -426,35 +426,55 @@
       return code === 0 || code === 1 || code === 2;
     }
 
-    // Returns true if any hour in the given dayIndex has a sunny/partly-sunny code.
+    // Daylight window used to evaluate the day's dominant weather pattern.
+    const DAYLIGHT_START_HOUR = 7;  // 7 am (inclusive)
+    const DAYLIGHT_END_HOUR   = 19; // 7 pm (exclusive)
+    // Fraction of daylight hours that must be partly-sunny-or-better for a day
+    // to be considered "sunny".  0.5 = majority required.
+    const SUNNY_MAJORITY_THRESHOLD = 0.5;
+
+    // Returns true if at least SUNNY_MAJORITY_THRESHOLD of daylight hours
+    // (7 am–7 pm) for the given day have a partly-sunny-or-better code (0/1/2).
     // Falls back to the daily code when hourly data is unavailable.
     function hasSunnyHour(cityData, dayIndex) {
       if (cityData.hourlyData && cityData.hourlyData.weather_code) {
-        const startHour = dayIndex * 24;
-        const endHour = startHour + 24;
+        const dayStart = dayIndex * 24;
         const codes = cityData.hourlyData.weather_code;
-        for (let i = startHour; i < endHour && i < codes.length; i++) {
-          if (isPartlySunnyOrBetter(codes[i])) return true;
+        let sunnyCount = 0;
+        let totalDaylight = 0;
+        for (let h = DAYLIGHT_START_HOUR; h < DAYLIGHT_END_HOUR; h++) {
+          const i = dayStart + h;
+          if (i >= codes.length) continue;
+          totalDaylight++;
+          if (isPartlySunnyOrBetter(codes[i])) sunnyCount++;
         }
-        return false;
+        if (totalDaylight === 0) {
+          return cityData.dailyData && isPartlySunnyOrBetter(cityData.dailyData.weather_code[dayIndex]);
+        }
+        return sunnyCount / totalDaylight >= SUNNY_MAJORITY_THRESHOLD;
       }
       // Fallback: use daily code
       return cityData.dailyData && isPartlySunnyOrBetter(cityData.dailyData.weather_code[dayIndex]);
     }
 
-    // Returns the best (sunniest) hourly weather code for the given day, or the daily code as fallback.
+    // Returns the dominant (most frequent) hourly weather code during daylight
+    // hours (7 am–7 pm) for the given day, or the daily code as fallback.
+    // Ties are broken by preferring the lower (sunnier) code.
     function bestSunnyCode(cityData, dayIndex) {
       if (cityData.hourlyData && cityData.hourlyData.weather_code) {
-        const startHour = dayIndex * 24;
-        const endHour = startHour + 24;
+        const dayStart = dayIndex * 24;
         const codes = cityData.hourlyData.weather_code;
-        let best = null;
-        for (let i = startHour; i < endHour && i < codes.length; i++) {
-          if (isPartlySunnyOrBetter(codes[i])) {
-            if (best === null || codes[i] < best) best = codes[i];
-          }
+        const freq = {};
+        for (let h = DAYLIGHT_START_HOUR; h < DAYLIGHT_END_HOUR; h++) {
+          const i = dayStart + h;
+          if (i >= codes.length) continue;
+          freq[codes[i]] = (freq[codes[i]] || 0) + 1;
         }
-        if (best !== null) return best;
+        const entries = Object.entries(freq);
+        if (entries.length > 0) {
+          entries.sort((a, b) => b[1] - a[1] || Number(a[0]) - Number(b[0]));
+          return parseInt(entries[0][0], 10);
+        }
       }
       return cityData.dailyData ? cityData.dailyData.weather_code[dayIndex] : null;
     }
